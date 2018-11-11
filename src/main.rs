@@ -84,7 +84,7 @@ fn main() -> ZippyResult<()> {
     if let Some(zip_matches) = matches.subcommand_matches("zip") {
         if let Some(output_path) = zip_matches.value_of("output") {
             let output_path: &Path = Path::new(output_path);
-            log!("zip to {}", output_path.display());
+            log!("creating zip file @ {}", output_path.display());
             let mut zippy = Zippy::new();
             if let Some(input_paths) = zip_matches.values_of("input") {
                 zippy.zip(
