@@ -3,6 +3,10 @@ name = "zippy"
 version = "0.1.2"
 authors = ["Joey Ezechiels <joey.ezechiels@gmail.com>"]
 license = "MIT"
+description = "CLI-based un/zipping tool that's available anywhere Rust is."
+documentation = "https://docs.rs/zippy"
+homepage = "https://github.com/jjpe/zippy"
+repository = "https://github.com/jjpe/zippy"
 
 [dependencies]
 clap = "2.32"
