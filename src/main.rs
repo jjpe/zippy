@@ -206,17 +206,10 @@ impl Zippy {
         }
 
         let mut archive = ZipArchive::new(File::open(&zip_filepath)?)?;
-
         for i in 0..archive.len() {
             let mut zip_file: ZipFile = archive.by_index(i)?;
-            let output_path: PathBuf = zip_file.sanitized_name();
-
-            {
-                let comment = zip_file.comment();
-                if !comment.is_empty() {
-                    println!("[unzip/{}] comment: {}", i, comment);
-                }
-            }
+            let output_path: PathBuf = output_dirpath.join(zip_file.sanitized_name());
+            Self::log_comment(i, &zip_file);
 
             if (&*zip_file.name()).ends_with('/') {
                 println!("[unzip/{}] extracted dir {}", i, output_path.display());
@@ -233,17 +226,34 @@ impl Zippy {
                          Self::humanize(zip_file.size()));
             }
 
-            #[cfg(unix)] { // get and set file permissions
-                use std::os::unix::fs::PermissionsExt;
-                if let Some(mode) = zip_file.unix_mode() {
-                    let permissions = fs::Permissions::from_mode(mode);
-                    fs::set_permissions(&output_path, permissions)?;
-                }
-            }
+            Self::set_file_permissions(&zip_file, &output_path)?;
         }
         log!("[unzip] extracted {} files.", archive.len());
-
         Ok(())
+    }
+
+    fn log_comment(file_num: usize, zip_file: &ZipFile) {
+        let comment = zip_file.comment();
+        if !comment.is_empty() {
+            println!("[unzip/{}] comment: {}", file_num, comment);
+        }
+    }
+
+    #[cfg(unix)]
+    fn set_file_permissions(zip_file: &ZipFile, output_path: &Path)
+                            -> ZippyResult<()> {
+        use std::os::unix::fs::PermissionsExt;
+        if let Some(mode) = zip_file.unix_mode() {
+            let permissions = fs::Permissions::from_mode(mode);
+            fs::set_permissions(&output_path, permissions)?;
+        }
+        Ok(())
+    }
+
+    #[cfg(not(unix))]
+    fn set_file_permissions(zip_file: &ZipFile, output_path: &Path)
+                            -> ZippyResult<()> {
+        Ok(()) // NOP
     }
 
     #[allow(non_upper_case_globals)]
