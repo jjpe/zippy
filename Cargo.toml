@@ -1,0 +1,10 @@
+[package]
+name = "zippy"
+version = "0.1.0"
+authors = ["Joey Ezechiels <joey.ezechiels@gmail.com>"]
+
+[dependencies]
+clap = "2.32"
+ioe = "0.3"
+walkdir = "2.2"
+zip = "0.4"
