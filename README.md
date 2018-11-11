@@ -4,7 +4,7 @@ It is intended to be a simple but useful component during the packaging step of
 complex software.
 
 ## Installation
-Installing the Zippu is as easy as `cargo install zippy`.
+Installing the Zippy is as easy as `cargo install zippy`.
 
 ## Usage
 Zippy has some sub-commands that help it perform its tasks:
