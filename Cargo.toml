@@ -1,6 +1,6 @@
 [package]
 name = "zippy"
-version = "0.1.0"
+version = "0.1.2"
 authors = ["Joey Ezechiels <joey.ezechiels@gmail.com>"]
 license = "MIT"
 
