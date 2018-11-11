@@ -2,6 +2,7 @@
 name = "zippy"
 version = "0.1.0"
 authors = ["Joey Ezechiels <joey.ezechiels@gmail.com>"]
+license = "MIT"
 
 [dependencies]
 clap = "2.32"
