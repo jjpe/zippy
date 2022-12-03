@@ -7,6 +7,7 @@ description = "CLI-based un/zipping tool that's available anywhere Rust is."
 documentation = "https://docs.rs/zippy"
 homepage = "https://github.com/jjpe/zippy"
 repository = "https://github.com/jjpe/zippy"
+edition = "2021"
 
 [dependencies]
 clap = "2.32"

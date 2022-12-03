@@ -1,8 +1,3 @@
-extern crate clap;
-extern crate ioe;
-extern crate walkdir;
-extern crate zip;
-
 #[macro_use] mod log;
 mod result;
 
