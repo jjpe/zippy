@@ -208,7 +208,9 @@ impl Zippy {
         let mut archive = ZipArchive::new(File::open(&zip_filepath)?)?;
         for i in 0..archive.len() {
             let mut zip_file: ZipFile = archive.by_index(i)?;
-            let output_path: PathBuf = output_dirpath.join(zip_file.sanitized_name());
+            let zip_file_name = zip_file.enclosed_name()
+                .expect("Failed to extract file name from zip archive (idx: {i})");
+            let output_path: PathBuf = output_dirpath.join(zip_file_name);
             Self::log_comment(i, &zip_file);
 
             if (&*zip_file.name()).ends_with('/') {
