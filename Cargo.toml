@@ -10,7 +10,10 @@ repository = "https://github.com/jjpe/zippy"
 edition = "2021"
 
 [dependencies]
-clap = "2.32"
 ioe = "0.5.1"
 walkdir = "2.3.2"
 zip = "0.6.3"
+
+[dependencies.clap]
+version = "4.0.29"
+features = ["cargo", "derive"]

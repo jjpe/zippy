@@ -1,7 +1,7 @@
 #[macro_use] mod log;
 mod result;
 
-use clap::{Arg, ArgMatches, App, SubCommand};
+use clap::{Parser, Subcommand};
 use std::env;
 use std::io::{self, Read, Seek, Write};
 use std::fs::{self, File};
@@ -19,56 +19,70 @@ use crate::result::ZippyResult;
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+fn about() -> String {
+    let mut buf = String::new();
+    buf.push_str(&format!("{APP_NAME} v{APP_VERSION}\n"));
+    buf.push_str(&format!(
+        "{APP_NAME} is a simple tool for de/compressing zip files.\n"
+    ));
+    buf.push_str("It has the following features:\n");
+    buf.push_str("- Installable using `cargo install zippy`\n");
+    buf.push_str("- Easy to use");
+    buf
+}
+
+#[derive(Debug, Parser)]
+#[command(
+    author,
+    version,
+    about = about(),
+)]
+struct CliArgs {
+    #[command(subcommand)]
+    command: Command,
+
+    /// Sets the level of verbosity
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    verbosity: u8,
+
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+    #[command(arg_required_else_help = true)]
+    /// Decompress a zip file.
+    Unzip {
+        #[arg(required = true, short, long)]
+        /// File path of the input zip archive
+        input: PathBuf,
+        #[arg(required = true, short, long)]
+        /// Dir path of the output directory
+        output: PathBuf,
+    },
+    #[command(arg_required_else_help = true)]
+    /// Compress files and directories into a zip file.
+    Zip {
+        #[arg(required = true, num_args = 1.., short, long)]
+        /// File paths of the files to be archived
+        inputs: Vec<PathBuf>,
+        #[arg(required = true, short, long)]
+        /// File path of the output zip archive
+        output: PathBuf,
+    },
+}
+
 fn main() -> ZippyResult<()> {
-    let matches: ArgMatches = App::new(APP_NAME)
-        .version(APP_VERSION)
-        .author("Joey Ezechiels")
-        .about("A CLI-based, `Cargo install`able way to un/zip files & directories.")
-        .arg(Arg::with_name("v")
-             .short("v")
-             .multiple(true)
-             .help("Sets the level of verbosity"))
-        .subcommand(SubCommand::with_name("unzip")
-                    .about("uncompress a zip file.")
-                    .arg(Arg::with_name("input")
-                         .required(true)
-                         .takes_value(true)
-                         .short("i")
-                         .long("input")
-                         .help("A zip file to unzip."))
-                    .arg(Arg::with_name("output")
-                         .required(true)
-                         .takes_value(true)
-                         .short("o")
-                         .long("output")
-                         .help("The destination of the zip file's uncompressed contents.")))
-        .subcommand(SubCommand::with_name("zip")
-                    .about("compress files and directories into a zip file.")
-                    .arg(Arg::with_name("input")
-                         .multiple(true)
-                         .required(true)
-                         .takes_value(true)
-                         .short("i")
-                         .long("input")
-                         .help("A list of input files and directories to zip."))
-                    .arg(Arg::with_name("output")
-                         .required(true)
-                         .takes_value(true)
-                         .short("o")
-                         .long("output")
-                         .help("The destination zip file.")))
-        .get_matches();
+    let cli = CliArgs::parse();
 
     // Record how many times the user used the "verbose" flag
     // (e.g. 'myprog -v -v -v' or 'myprog -vvv' vs 'myprog -v')
-    let num_verbose_flags: u64 = matches.occurrences_of("v");
-    let verbose_flag = "v".repeat(num_verbose_flags as usize);
-    match num_verbose_flags {
+    let verbose_flag = "v".repeat(cli.verbosity as usize);
+    match cli.verbosity {
         0 => {/* silent mode */},
-        1 => log!("-{}: verbose mode", verbose_flag),
-        2 => log!("-{}: very verbose mode", verbose_flag),
+        1 => log!("-{verbose_flag}: verbose mode"),
+        2 => log!("-{verbose_flag}: very verbose mode"),
         _ => {
-            log!("-{}: why do you even want so much information?", verbose_flag);
+            log!("-{verbose_flag}: why do you even want so much information?");
             process::exit(-1);
         },
     }
@@ -76,35 +90,36 @@ fn main() -> ZippyResult<()> {
     // TODO: The `method` should be an argument to the `zip` subcmd:
     let compression_method = CompressionMethod::Stored;
 
-    if let Some(zip_matches) = matches.subcommand_matches("zip") {
-        if let Some(output_path) = zip_matches.value_of("output") {
-            let output_path: &Path = Path::new(output_path);
-            log!("creating zip file @ {}", output_path.display());
-            let mut zippy = Zippy::new();
-            if let Some(input_paths) = zip_matches.values_of("input") {
-                zippy.zip(
-                    input_paths.into_iter().map(Path::new),
-                    output_path,
-                    compression_method
-                )?;
-            }
-        }
-    }
-
-    if let Some(unzip_matches) = matches.subcommand_matches("unzip") {
-        let unzip_matches: &ArgMatches = unzip_matches;
-        if let Some(output_dirpath) = unzip_matches.value_of("output") {
-            let output_dirpath: &Path = Path::new(output_dirpath);
-            log!("unzip to {}", output_dirpath.display());
-            let mut zippy = Zippy::new();
-            if let Some(input_zip_path) = unzip_matches.value_of("input") {
-                zippy.unzip(input_zip_path, output_dirpath)?;
-            }
-        }
+    let mut zippy = Zippy::new();
+    match &cli.command {
+        Command::Unzip { input, output } => {
+            ensure_dir_exists(Some(output))?;
+            log!("unzip to directory {}", output.display());
+            zippy.unzip(input, output)?;
+        },
+        Command::Zip { inputs, output } => {
+            ensure_dir_exists(output.parent())?;
+            log!("zip to file @ {}", output.display());
+            zippy.zip(
+                inputs.iter().map(PathBuf::as_path),
+                &output,
+                compression_method
+            )?;
+        },
     }
 
     Ok(())
 }
+
+fn ensure_dir_exists(dirpath: Option<&Path>) -> ZippyResult<()> {
+    match dirpath {
+        Some(dir) if dir.exists() => {/*NOP*/},
+        Some(dir) => std::fs::create_dir_all(dir)?,
+        None => std::fs::create_dir(std::env::current_dir()?)?,
+    }
+    Ok(())
+}
+
 
 struct Zippy {
     buffer: Vec<u8>,
@@ -117,11 +132,12 @@ impl Zippy {
         }
     }
 
-    pub fn zip<'z>(&'z mut self,
-                   input_paths: impl Iterator<Item = &'z Path>,
-                   output_path: &Path,
-                   method: CompressionMethod)
-                   -> ZippyResult<()> {
+    pub fn zip<'z>(
+        &'z mut self,
+        input_paths: impl Iterator<Item = &'z Path>,
+        output_path: &Path,
+        method: CompressionMethod
+    ) -> ZippyResult<()> {
         if output_path.exists() {
             // TODO: addition mode i.e. open the existing
             // zip file and add the new contents to it.
