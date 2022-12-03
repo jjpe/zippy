@@ -1,6 +1,6 @@
 [package]
 name = "zippy"
-version = "0.1.3"
+version = "0.2.0"
 authors = ["Joey Ezechiels <joey.ezechiels@gmail.com>"]
 license = "MIT"
 description = "CLI-based un/zipping tool that's available anywhere Rust is."
