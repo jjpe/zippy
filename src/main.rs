@@ -103,7 +103,7 @@ fn main() -> ZippyResult<()> {
             log!("unzip to {}", output_dirpath.display());
             let mut zippy = Zippy::new();
             if let Some(input_zip_path) = unzip_matches.value_of("input") {
-                zippy.unzip(Path::new(input_zip_path), output_dirpath)?;
+                zippy.unzip(input_zip_path, output_dirpath)?;
             }
         }
     }
@@ -198,8 +198,13 @@ impl Zippy {
         Ok(())
     }
 
-    pub fn unzip(&mut self, zip_filepath: &Path, output_dirpath: &Path)
-                 -> ZippyResult<()> {
+    pub fn unzip(
+        &mut self,
+        zip_filepath: impl AsRef<Path>,
+        output_dirpath: impl AsRef<Path>,
+    ) -> ZippyResult<()> {
+        let zip_filepath = zip_filepath.as_ref();
+        let output_dirpath = output_dirpath.as_ref();
         if !output_dirpath.exists() {
             fs::create_dir(output_dirpath)?;
             println!("[unzip] created {}", output_dirpath.display());
