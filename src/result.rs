@@ -1,6 +1,5 @@
 ///
-
-use ioe::{IoError};
+use ioe::IoError;
 use std::io;
 use std::path::StripPrefixError;
 use walkdir::Error as WalkDirError;
@@ -17,7 +16,9 @@ pub enum ZippyError {
 }
 
 impl From<IoError> for ZippyError {
-    fn from(err: IoError) -> ZippyError { ZippyError::IoError(err) }
+    fn from(err: IoError) -> ZippyError {
+        ZippyError::IoError(err)
+    }
 }
 
 impl From<io::Error> for ZippyError {
@@ -33,9 +34,13 @@ impl From<StripPrefixError> for ZippyError {
 }
 
 impl From<WalkDirError> for ZippyError {
-    fn from(err: WalkDirError) -> ZippyError { ZippyError::WalkDirError(err) }
+    fn from(err: WalkDirError) -> ZippyError {
+        ZippyError::WalkDirError(err)
+    }
 }
 
 impl From<ZipError> for ZippyError {
-    fn from(err: ZipError) -> ZippyError { ZippyError::ZipError(err) }
+    fn from(err: ZipError) -> ZippyError {
+        ZippyError::ZipError(err)
+    }
 }

@@ -1,20 +1,17 @@
-#[macro_use] mod log;
+#[macro_use]
+mod log;
 mod result;
 
+use crate::result::ZippyResult;
 use clap::{Parser, Subcommand, ValueEnum};
 use std::env;
-use std::io::{self, Read, Seek, Write};
 use std::fs::{self, File};
+use std::io::{self, Read, Seek, Write};
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::process;
-use walkdir::{WalkDir, DirEntry};
-use zip::{
-    CompressionMethod, ZipArchive, ZipWriter,
-    read::ZipFile,
-    write::FileOptions,
-};
-use crate::result::ZippyResult;
+use walkdir::{DirEntry, WalkDir};
+use zip::{read::ZipFile, write::FileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
 const APP_NAME: &str = env!("CARGO_PKG_NAME");
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -96,8 +93,6 @@ impl From<Method> for CompressionMethod {
     }
 }
 
-
-
 fn main() -> ZippyResult<()> {
     let cli_args = CliArgs::parse();
 
@@ -105,13 +100,13 @@ fn main() -> ZippyResult<()> {
     // (e.g. 'myprog -v -v -v' or 'myprog -vvv' vs 'myprog -v')
     let verbose_flag = "v".repeat(cli_args.verbosity as usize);
     match cli_args.verbosity {
-        0 => {/* silent mode */},
+        0 => { /* silent mode */ }
         1 => log!("-{verbose_flag}: verbose mode"),
         2 => log!("-{verbose_flag}: very verbose mode"),
         _ => {
             log!("-{verbose_flag}: why do you even want so much information?");
             process::exit(-1);
-        },
+        }
     }
 
     let mut zippy = Zippy::new();
@@ -120,7 +115,7 @@ fn main() -> ZippyResult<()> {
             ensure_dir_exists(Some(output))?;
             log!("unzip to directory {}", output.display());
             zippy.unzip(input, output)?;
-        },
+        }
         Command::Zip { inputs, output, method, level } => {
             ensure_dir_exists(output.parent())?;
             log!("zip to file @ {}", output.display());
@@ -130,7 +125,7 @@ fn main() -> ZippyResult<()> {
                 (*method).into(),
                 *level,
             )?;
-        },
+        }
     }
 
     Ok(())
@@ -138,13 +133,12 @@ fn main() -> ZippyResult<()> {
 
 fn ensure_dir_exists(dirpath: Option<&Path>) -> ZippyResult<()> {
     match dirpath {
-        Some(dir) if dir.exists() => {/*NOP*/},
+        Some(dir) if dir.exists() => { /*NOP*/ }
         Some(dir) => std::fs::create_dir_all(dir)?,
         None => std::fs::create_dir(std::env::current_dir()?)?,
     }
     Ok(())
 }
-
 
 struct Zippy {
     buffer: Vec<u8>,
@@ -152,9 +146,7 @@ struct Zippy {
 
 impl Zippy {
     pub fn new() -> Self {
-        Self {
-            buffer: vec![],
-        }
+        Self { buffer: vec![] }
     }
 
     pub fn zip<'zip>(
@@ -189,12 +181,15 @@ impl Zippy {
         Ok(())
     }
 
-    fn add_file<W>(&mut self,
-                   input_filepath: &Path,
-                   zip: &mut ZipWriter<W>,
-                   options: FileOptions)
-                   -> ZippyResult<()>
-    where W: Write + Seek {
+    fn add_file<W>(
+        &mut self,
+        input_filepath: &Path,
+        zip: &mut ZipWriter<W>,
+        options: FileOptions,
+    ) -> ZippyResult<()>
+    where
+        W: Write + Seek,
+    {
         if !input_filepath.is_file() {
             panic!("Error: not a file: {}", input_filepath.display());
             // TODO
@@ -212,24 +207,25 @@ impl Zippy {
         Ok(())
     }
 
-    fn add_dir<W>(&mut self,
-                  input_dirpath: &Path,
-                  zip: &mut ZipWriter<W>,
-                  options: FileOptions)
-                  -> ZippyResult<()>
-    where W: Write + Seek {
+    fn add_dir<W>(
+        &mut self,
+        input_dirpath: &Path,
+        zip: &mut ZipWriter<W>,
+        options: FileOptions,
+    ) -> ZippyResult<()>
+    where
+        W: Write + Seek,
+    {
         let dirpath: PathBuf = fs::canonicalize(input_dirpath)?;
         if !dirpath.is_dir() {
             panic!("Error: not a directory: {}", dirpath.display());
             // TODO
         }
-        // log!("zip DIR {}", dirpath.display());
         for entry in WalkDir::new(&dirpath) { // recursively walk `dirpath`
             let entry: DirEntry = entry?;
             let entry_path: PathBuf = fs::canonicalize(entry.path())?;
             if entry_path.is_dir() {
-                // log!("SKIP dir {}", entry_path.display());
-                continue
+                continue;
             }
             self.add_file(&entry_path, zip, options)?;
         }
@@ -251,7 +247,8 @@ impl Zippy {
         let mut archive = ZipArchive::new(File::open(&zip_filepath)?)?;
         for i in 0..archive.len() {
             let mut zip_file: ZipFile = archive.by_index(i)?;
-            let zip_file_name = zip_file.enclosed_name()
+            let zip_file_name = zip_file
+                .enclosed_name()
                 .expect("Failed to extract file name from zip archive (idx: {i})");
             let output_path: PathBuf = output_dirpath.join(zip_file_name);
             Self::log_comment(i, &zip_file);
@@ -265,10 +262,12 @@ impl Zippy {
                 }
                 let mut output_file = File::create(&output_path)?;
                 io::copy(&mut zip_file, &mut output_file)?;
-                println!("[unzip/{}] extracted file {} ({})",
-                         i,
-                         output_path.display(),
-                         Self::humanize(zip_file.size()));
+                println!(
+                    "[unzip/{}] extracted file {} ({})",
+                    i,
+                    output_path.display(),
+                    Self::humanize(zip_file.size())
+                );
             }
 
             Self::set_file_permissions(&zip_file, &output_path)?;
@@ -285,8 +284,7 @@ impl Zippy {
     }
 
     #[cfg(unix)]
-    fn set_file_permissions(zip_file: &ZipFile, output_path: &Path)
-                            -> ZippyResult<()> {
+    fn set_file_permissions(zip_file: &ZipFile, output_path: &Path) -> ZippyResult<()> {
         use std::os::unix::fs::PermissionsExt;
         if let Some(mode) = zip_file.unix_mode() {
             let permissions = fs::Permissions::from_mode(mode);
@@ -296,39 +294,33 @@ impl Zippy {
     }
 
     #[cfg(not(unix))]
-    fn set_file_permissions(zip_file: &ZipFile, output_path: &Path)
-                            -> ZippyResult<()> {
+    fn set_file_permissions(zip_file: &ZipFile, output_path: &Path) -> ZippyResult<()> {
         Ok(()) // NOP
     }
 
     #[allow(non_upper_case_globals)]
     fn humanize<N>(bytes: N) -> String
-    where N: Into<u128> {
+    where
+        N: Into<u128>,
+    {
         let bytes: u128 = bytes.into();
-        const KiB: u128 = 1024;        // kibibyte
-        const MiB: u128 = 1024 * KiB;  // mebibyte
-        const GiB: u128 = 1024 * MiB;  // gibibyte
-        const TiB: u128 = 1024 * GiB;  // tebibyte
-        const PiB: u128 = 1024 * TiB;  // pebibyte
-        const EiB: u128 = 1024 * PiB;  // exbibyte
-        const ZiB: u128 = 1024 * EiB;  // zebibyte
-        const YiB: u128 = 1024 * ZiB;  // yobibyte
+        const KiB: u128 = 1024; // kibibyte
+        const MiB: u128 = 1024 * KiB; // mebibyte
+        const GiB: u128 = 1024 * MiB; // gibibyte
+        const TiB: u128 = 1024 * GiB; // tebibyte
+        const PiB: u128 = 1024 * TiB; // pebibyte
+        const EiB: u128 = 1024 * PiB; // exbibyte
+        const ZiB: u128 = 1024 * EiB; // zebibyte
+        const YiB: u128 = 1024 * ZiB; // yobibyte
         match bytes {
-            bytes if bytes < KiB => format!("{} bytes", bytes),
-            bytes if KiB <= bytes && bytes < MiB =>
-                format!("{} KiB", bytes / KiB),
-            bytes if MiB <= bytes && bytes < GiB =>
-                format!("{} MiB", bytes / MiB),
-            bytes if GiB <= bytes && bytes < TiB =>
-                format!("{} GiB", bytes / GiB),
-            bytes if TiB <= bytes && bytes < EiB =>
-                format!("{} TiB", bytes / TiB),
-            bytes if EiB <= bytes && bytes < ZiB =>
-                format!("{} EiB", bytes / EiB),
-            bytes if ZiB <= bytes && bytes < YiB =>
-                format!("{} ZiB", bytes / ZiB),
-            bytes => format!("{} YiB", bytes / YiB),
+            b if b < KiB => format!("{} bytes", b),
+            b if KiB <= b && b < MiB => format!("{} KiB", b / KiB),
+            b if MiB <= b && b < GiB => format!("{} MiB", b / MiB),
+            b if GiB <= b && b < TiB => format!("{} GiB", b / GiB),
+            b if TiB <= b && b < EiB => format!("{} TiB", b / TiB),
+            b if EiB <= b && b < ZiB => format!("{} EiB", b / EiB),
+            b if ZiB <= b && b < YiB => format!("{} ZiB", b / ZiB),
+            b => format!("{} YiB", b / YiB),
         }
     }
-
 }
