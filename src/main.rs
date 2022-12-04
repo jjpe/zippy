@@ -66,7 +66,7 @@ enum Command {
         output: PathBuf,
         #[arg(short, long)]
         /// The decompression method to use
-        method: Method,
+        method: Option<Method>,
         #[arg(short, long)]
         /// The compression level is dependant on which compression method
         /// is used; See the `zip-rs` documentation for more info
@@ -74,10 +74,11 @@ enum Command {
     },
 }
 
-#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq, Default)]
 enum Method {
     Bzip2,
     Deflate,
+    #[default]
     Store,
     Zstd,
 }
@@ -122,7 +123,7 @@ fn main() -> ZippyResult<()> {
             zippy.zip(
                 inputs.iter().map(PathBuf::as_path),
                 &output,
-                (*method).into(),
+                method.unwrap_or_default().into(),
                 *level,
             )?;
         }
