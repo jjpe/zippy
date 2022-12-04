@@ -1,7 +1,7 @@
 #[macro_use] mod log;
 mod result;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::env;
 use std::io::{self, Read, Seek, Write};
 use std::fs::{self, File};
@@ -44,7 +44,6 @@ struct CliArgs {
     /// Sets the level of verbosity
     #[arg(short, long, action = clap::ArgAction::Count)]
     verbosity: u8,
-
 }
 
 #[derive(Debug, Subcommand)]
@@ -68,16 +67,44 @@ enum Command {
         #[arg(required = true, short, long)]
         /// File path of the output zip archive
         output: PathBuf,
+        #[arg(short, long)]
+        /// The decompression method to use
+        method: Method,
+        #[arg(short, long)]
+        /// The compression level is dependant on which compression method
+        /// is used; See the `zip-rs` documentation for more info
+        level: Option<i32>,
     },
 }
 
+#[derive(ValueEnum, Copy, Clone, Debug, PartialEq, Eq)]
+enum Method {
+    Bzip2,
+    Deflate,
+    Store,
+    Zstd,
+}
+
+impl From<Method> for CompressionMethod {
+    fn from(method: Method) -> Self {
+        match method {
+            Method::Bzip2 => CompressionMethod::Bzip2,
+            Method::Deflate => CompressionMethod::Deflated,
+            Method::Store => CompressionMethod::Stored,
+            Method::Zstd => CompressionMethod::Zstd,
+        }
+    }
+}
+
+
+
 fn main() -> ZippyResult<()> {
-    let cli = CliArgs::parse();
+    let cli_args = CliArgs::parse();
 
     // Record how many times the user used the "verbose" flag
     // (e.g. 'myprog -v -v -v' or 'myprog -vvv' vs 'myprog -v')
-    let verbose_flag = "v".repeat(cli.verbosity as usize);
-    match cli.verbosity {
+    let verbose_flag = "v".repeat(cli_args.verbosity as usize);
+    match cli_args.verbosity {
         0 => {/* silent mode */},
         1 => log!("-{verbose_flag}: verbose mode"),
         2 => log!("-{verbose_flag}: very verbose mode"),
@@ -87,23 +114,21 @@ fn main() -> ZippyResult<()> {
         },
     }
 
-    // TODO: The `method` should be an argument to the `zip` subcmd:
-    let compression_method = CompressionMethod::Stored;
-
     let mut zippy = Zippy::new();
-    match &cli.command {
+    match &cli_args.command {
         Command::Unzip { input, output } => {
             ensure_dir_exists(Some(output))?;
             log!("unzip to directory {}", output.display());
             zippy.unzip(input, output)?;
         },
-        Command::Zip { inputs, output } => {
+        Command::Zip { inputs, output, method, level } => {
             ensure_dir_exists(output.parent())?;
             log!("zip to file @ {}", output.display());
             zippy.zip(
                 inputs.iter().map(PathBuf::as_path),
                 &output,
-                compression_method
+                (*method).into(),
+                *level,
             )?;
         },
     }
@@ -132,11 +157,12 @@ impl Zippy {
         }
     }
 
-    pub fn zip<'z>(
-        &'z mut self,
-        input_paths: impl Iterator<Item = &'z Path>,
+    pub fn zip<'zip>(
+        &'zip mut self,
+        input_paths: impl Iterator<Item = &'zip Path>,
         output_path: &Path,
-        method: CompressionMethod
+        method: CompressionMethod,
+        level: Option<i32>,
     ) -> ZippyResult<()> {
         if output_path.exists() {
             // TODO: addition mode i.e. open the existing
@@ -147,7 +173,8 @@ impl Zippy {
         let mut zip: ZipWriter<_> = ZipWriter::new(File::create(output_path)?);
         let options = FileOptions::default()
             .compression_method(method)
-            .unix_permissions(0o755);
+            .unix_permissions(0o755)
+            .compression_level(level);
         for input_path in input_paths {
             // log!("input: {}", input_path.display());
             if input_path.is_dir() {
