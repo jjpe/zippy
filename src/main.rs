@@ -159,7 +159,7 @@ impl Zippy {
     ) -> ZippyResult<()> {
         if output_path.exists() {
             // TODO: addition mode i.e. open the existing
-            // zip file and add the new contents to it.
+            //       zip file and add the new contents to it.
             log!("zip file exists: {}", output_path.display());
             process::exit(-1);
         }
